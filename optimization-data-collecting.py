@@ -5,7 +5,7 @@ import requests
 from time import gmtime, strftime, sleep
 from _collections import defaultdict
 
-raw_gamer_tag = 'o kMaC o'  # ENTER GAMER TAG CASE SENSITIVE
+raw_gamer_tag = 'Sneaky Wizard'  # ENTER GAMER TAG CASE SENSITIVE
 
 gamer_tag = raw_gamer_tag.replace(" ", "%20")
 root_url = 'http://halo.bungie.net'
@@ -15,7 +15,7 @@ root_url = 'http://halo.bungie.net'
 def get_game_page_urls(i, z):
     response = requests.get(z + str(i))
     soup = bs4.BeautifulSoup(response.text, "lxml")
-    return [a.attrs.get('href') for a in soup.select('tbody a[href^=/Stats]')]
+    return [a['href'] for a in soup.select('tbody a[href*=Stats]')]
 
 
 def get_total_pages(z):
@@ -42,7 +42,9 @@ def calculate_time_played(data):
     return "\nPlay Time : %d days, %d hours, %d minutes and %d seconds" % (dd, hh, mm, ss)
 
 
-def start_data_collecting(results, gmode):
+def start_data_collecting(game_history_url, gmode):
+    last_page = int(get_total_pages(game_history_url)) + 1
+
     myarray_kills = numpy.array([])
     myarray_assists = numpy.array([])
     myarray_deaths = numpy.array([])
@@ -54,21 +56,35 @@ def start_data_collecting(results, gmode):
     game_duration = []
     maps_played = []
 
-    for k in range(len(results)):
-        try:
-            myarray_kills = numpy.append(myarray_kills, [numpy.array([results[k]['kills']])])
-            myarray_assists = numpy.append(myarray_assists, [numpy.array([results[k]['assists']])])
-            myarray_deaths = numpy.append(myarray_deaths, [numpy.array([results[k]['deaths']])])
-            myarray_kd = numpy.append(myarray_kd, [numpy.array([results[k]['kd']])])
-            myarray_skill = numpy.append(myarray_skill, [numpy.array([results[k]['skill']])])
+    print("-------- Collecting {} Game Data --------".format(gmode))
 
-            maps_played.append(results[k]['map'])
-            game_duration.append(results[k]['duration'])
+    # for i in range(1, 10):  # for testing
+    for i in range(1, last_page):  # all games on bungie.net
 
-            myarray_date = numpy.hstack([myarray_date, numpy.array([results[k]['date'].strip(",")])])
+        game_page_urls = get_game_page_urls(i, game_history_url)
 
-        except KeyError:
-            continue
+        # sleep(1)
+
+        pool = multiprocessing.Pool()
+        results = pool.map(get_game_data, game_page_urls)
+        pool.close()
+
+        for k in range(len(results)):
+            try:
+                myarray_kills = numpy.append(myarray_kills, [numpy.array([results[k]['kills']])])
+                myarray_assists = numpy.append(myarray_assists, [numpy.array([results[k]['assists']])])
+                myarray_deaths = numpy.append(myarray_deaths, [numpy.array([results[k]['deaths']])])
+                myarray_kd = numpy.append(myarray_kd, [numpy.array([results[k]['kd']])])
+                myarray_skill = numpy.append(myarray_skill, [numpy.array([results[k]['skill']])])
+
+                maps_played.append(results[k]['map'])
+                game_duration.append(results[k]['duration'])
+
+                myarray_date = numpy.hstack([myarray_date, numpy.array([results[k]['date'].strip(",")])])
+
+            except KeyError:
+                sleep(1)
+                continue
 
     numpy.savetxt('{}_{}_duration.txt'.format(gmode, gamer_tag), game_duration, delimiter=",", fmt="%s")
     numpy.savetxt('{}_{}_date.txt'.format(gmode, gamer_tag), myarray_date, delimiter=" ", fmt="%s")
@@ -145,7 +161,7 @@ def start_data_collecting(results, gmode):
 
 def get_game_data(game_page_url):
     collected_data = {}
-    debug = 0
+    # sleep(0.5)
 
     response = requests.get(root_url + game_page_url)
     soup = bs4.BeautifulSoup(response.text, "lxml")
@@ -156,22 +172,19 @@ def get_game_data(game_page_url):
         player_id = player_id.replace('overview', 'kills')
         player_id = player_id.replace('hlGamertag', 'trPlayerRow')
 
-        debug = 1
         collected_data['kills'] = [soup.select('#{} .col'.format(player_id))[0].get_text(), root_url + game_page_url]
         collected_data['assists'] = [soup.select('#{} .col'.format(player_id))[1].get_text(), root_url + game_page_url]
         collected_data['deaths'] = [soup.select('#{} .col'.format(player_id))[2].get_text(), root_url + game_page_url]
         collected_data['kd'] = [soup.select('#{} .col'.format(player_id))[3].get_text(), root_url + game_page_url]
 
-        debug = 2
         collected_data['skill'] = [soup.select('#{} .num'.format(player_id))[0].get_text(), soup.select('.summary li')[2].get_text().split(' - ')[1].strip('\xa0'), root_url + game_page_url]
         collected_data['map'] = soup.select('.summary li')[0].get_text().split(' on ')[1]
 
-        debug = 3
         collected_data['date'] = soup.select('.summary li')[3].get_text().strip(",").split()[0]
         collected_data['duration'] = soup.select('.summary li')[4].get_text().split()[1]
 
     except IndexError:
-        print("Debug({}): Broken url: ".format(debug), root_url + game_page_url)
+        print("Broken url: ", root_url + game_page_url)
 
     return collected_data
 
@@ -183,37 +196,21 @@ if __name__ == '__main__':
     print('Collecting Data for : ', raw_gamer_tag)
     print('-' * 66)
 
-    gmode = 'Matchmaking'
-    game_history_url = 'http://halo.bungie.net/stats/playerstatshalo3.aspx?player=' + gamer_tag + '&ctl00_mainContent_bnetpgl_recentgamesChangePage='
-    last_page = int(get_total_pages(game_history_url)) + 1
-
-    print("-------- Collecting {} Game Data --------".format(gmode))
-    print("Starting Time for Custom game data collecting:", strftime("%Y-%m-%d %H:%M:%S", gmtime()))
-
-    # for i in range(1, 10):  # for testing
-    for i in range(1, last_page):  # all games on bungie.net
-
-        game_page_urls = get_game_page_urls(i, game_history_url)
-
-        print(i, end=' ')
-
-        pool = multiprocessing.Pool()
-        results = pool.map(get_game_data, game_page_urls)
-        pool.close()
-
-        start_data_collecting(results, gmode)
-
-    # # Matchmaking : Ranked + Social
-    # print("Starting Time for Matchmaking data collecting:", strftime("%Y-%m-%d %H:%M:%S", gmtime()))
-    # start_data_collecting('http://halo.bungie.net/stats/playerstatshalo3.aspx?player=' + gamer_tag + '&ctl00_mainContent_bnetpgl_recentgamesChangePage=', 'Matchmaking')
-    # print("-------- Finished Matchmaking data:", strftime("%Y-%m-%d %H:%M:%S", gmtime()), "--------")
+    # Matchmaking : Ranked + Social
+    print("Starting Time for Matchmaking data collecting:", strftime("%Y-%m-%d %H:%M:%S", gmtime()))
+    print('http://halo.bungie.net/stats/playerstatshalo3.aspx?player=' + gamer_tag + '&ctl00_mainContent_bnetpgl_recentgamesChangePage=1')
+    start_data_collecting('http://halo.bungie.net/stats/playerstatshalo3.aspx?player=' + gamer_tag + '&ctl00_mainContent_bnetpgl_recentgamesChangePage=', 'Matchmaking')
+    print("-------- Finished Matchmaking data:", strftime("%Y-%m-%d %H:%M:%S", gmtime()), "--------")
 
     print()
 
+    '''
     # Custom Games
-    # print("Starting Time for Custom game data collecting:", strftime("%Y-%m-%d %H:%M:%S", gmtime()))
-    # start_data_collecting('http://halo.bungie.net/stats/playerstatshalo3.aspx?player=' + gamer_tag + '&cus=2&ctl00_mainContent_bnetpgl_recentgamesChangePage=', 'Custom')
+    print("Starting Time for Custom game data collecting:", strftime("%Y-%m-%d %H:%M:%S", gmtime()))
+    start_data_collecting('http://halo.bungie.net/stats/playerstatshalo3.aspx?player=' + gamer_tag + '&cus=2&ctl00_mainContent_bnetpgl_recentgamesChangePage=', 'Custom')
     print("-------- Finished Custom data:", strftime("%Y-%m-%d %H:%M:%S", gmtime()), " --------")
 
-    print()
+    print()    
+    '''
+
     print("Completed Data Collecting.")
