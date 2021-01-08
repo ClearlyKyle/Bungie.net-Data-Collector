@@ -7,6 +7,11 @@ import csv
 import cchardet
 import lxml
 from bs4 import BeautifulSoup
+from tqdm import tqdm
+
+# ENTER GAMERTAG CASE SENSITIVE
+# ----------------------------------------
+gamertag = "Sneaky Wizard"
 
 
 def getMainLink(tag):
@@ -32,9 +37,10 @@ def getNumberOfMatchMakingPages(link):
 def getLinksToGamePages(link):
     f = requests.get(link)
     soup = BeautifulSoup(f.content, 'lxml')
-    game_pages_QUEUE.put([i.get('href') for i in
+    game_pages_QUEUE.put([i.get('href').replace(" ", "%20") for i in
                           soup.find_all('a',
-                                        {"id": re.compile("mainContent"), "href": re.compile("Stats/GameStatsHalo3")})])
+                                        {"id": re.compile("mainContent_bnetpgl_recentgames"),
+                                         "href": re.compile("Stats/GameStatsHalo3")})])
 
 
 def gamePageDataCollection(link):
@@ -55,6 +61,11 @@ def gamePageDataCollection(link):
     player_id = player_id.replace('overview', 'kills')
     player_id = player_id.replace('hlGamertag', 'trPlayerRow')
 
+    players_in_game = soup.findAll('a', {'id' : re.compile('ctl00_mainContent_bnetpgd_overview')})
+    players = []
+    for p in players_in_game:
+        players.append(p.getText())
+
     carnage_report = soup.find('tr', id=player_id)
 
     skill_level = carnage_report.select(".num")[0].getText()
@@ -72,6 +83,8 @@ def gamePageDataCollection(link):
                          "kills": k,
                          "assists": a,
                          "deaths": d,
+                         "spread": ks,
+                         "players": players,
                          "date": date,
                          "url": page_url})
 
@@ -79,38 +92,44 @@ def gamePageDataCollection(link):
 game_pages_QUEUE = queue.Queue()
 page_data_QUEUE = queue.Queue()
 
-gamertag = "D3LTA ENF0RC3R"
-
 if __name__ == '__main__':
 
     print("Starting Collection\n")
     total_time_start = time.perf_counter()
 
     main_link = getMainLink(gamertag)
+
+    # All the pages in the "Matchmaking History"
     number_of_pages = getNumberOfMatchMakingPages(main_link)
+    print("Number of pages:", number_of_pages)
 
     start_timer = time.perf_counter()
 
     # Generate links to all the pages
     list_of_page_URLS = [main_link + str(i) for i in range(1, number_of_pages + 1)]
 
+    # Every game page that contains stats and information
+    print("> Collecting game pages...")
     with concurrent.futures.ThreadPoolExecutor() as executor:
-        executor.map(getLinksToGamePages, list_of_page_URLS)
+        # executor.map(getLinksToGamePages, list_of_page_URLS)
+        list(tqdm(executor.map(getLinksToGamePages, list_of_page_URLS), total=len(list_of_page_URLS)))
 
     game_pages_LIST = []
     while not game_pages_QUEUE.empty():
         for link in game_pages_QUEUE.get():
             game_pages_LIST.append(link)
 
+    time.sleep(1)
     print("Game Pages collected", len(game_pages_LIST))
     print("All game LINKS collected ({:.4f} seconds)".format(time.perf_counter() - start_timer))
 
     print()
-    print("> Analysing games")
+    print("> Analysing games...")
 
     game_data_LIST = []
     with concurrent.futures.ThreadPoolExecutor() as executor:
-        executor.map(gamePageDataCollection, game_pages_LIST)
+        # executor.map(gamePageDataCollection, game_pages_LIST)
+        list(tqdm(executor.map(gamePageDataCollection, game_pages_LIST), total=len(game_pages_LIST)))
 
     while not page_data_QUEUE.empty():
         game_data_LIST.append(page_data_QUEUE.get())

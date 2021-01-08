@@ -5,7 +5,7 @@ import requests
 from time import gmtime, strftime, sleep
 from _collections import defaultdict
 
-raw_gamer_tag = 'Sneaky Wizard'  # ENTER GAMER TAG CASE SENSITIVE
+raw_gamer_tag = 'Sneaky Wizard'  # ENTER GAMERTAG CASE SENSITIVE
 
 gamer_tag = raw_gamer_tag.replace(" ", "%20")
 root_url = 'http://halo.bungie.net'
