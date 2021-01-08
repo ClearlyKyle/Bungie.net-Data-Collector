@@ -177,9 +177,7 @@ def get_game_data(game_page_url):
         collected_data['deaths'] = [soup.select('#{} .col'.format(player_id))[2].get_text(), root_url + game_page_url]
         collected_data['kd'] = [soup.select('#{} .col'.format(player_id))[3].get_text(), root_url + game_page_url]
 
-        collected_data['skill'] = [soup.select('#{} .num'.format(player_id))[0].get_text(),
-                                   soup.select('.summary li')[2].get_text().split(' - ')[1].strip('\xa0'),
-                                   root_url + game_page_url]
+        collected_data['skill'] = [soup.select('#{} .num'.format(player_id))[0].get_text(), soup.select('.summary li')[2].get_text().split(' - ')[1].strip('\xa0'), root_url + game_page_url]
         collected_data['map'] = soup.select('.summary li')[0].get_text().split(' on ')[1]
 
         collected_data['date'] = soup.select('.summary li')[3].get_text().strip(",").split()[0]
@@ -200,10 +198,9 @@ if __name__ == '__main__':
 
     # Matchmaking : Ranked + Social
     print("Starting Time for Matchmaking data collecting:", strftime("%Y-%m-%d %H:%M:%S", gmtime()))
-    start_data_collecting(
-        'http://halo.bungie.net/stats/playerstatshalo3.aspx?player=' + gamer_tag + '&ctl00_mainContent_bnetpgl_recentgamesChangePage=',
-        'Matchmaking')
-    print("-------- Finished data:", strftime("%Y-%m-%d %H:%M:%S", gmtime()), "--------")
+    print('http://halo.bungie.net/stats/playerstatshalo3.aspx?player=' + gamer_tag + '&ctl00_mainContent_bnetpgl_recentgamesChangePage=1')
+    start_data_collecting('http://halo.bungie.net/stats/playerstatshalo3.aspx?player=' + gamer_tag + '&ctl00_mainContent_bnetpgl_recentgamesChangePage=', 'Matchmaking')
+    print("-------- Finished Matchmaking data:", strftime("%Y-%m-%d %H:%M:%S", gmtime()), "--------")
 
     print()
 

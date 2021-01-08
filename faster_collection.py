@@ -73,7 +73,7 @@ def gamePageDataCollection(link):
                          "assists": a,
                          "deaths": d,
                          "date": date,
-                         "url" : page_url})
+                         "url": page_url})
 
 
 game_pages_QUEUE = queue.Queue()
@@ -92,7 +92,7 @@ if __name__ == '__main__':
     start_timer = time.perf_counter()
 
     # Generate links to all the pages
-    list_of_page_URLS = [main_link + str(i) for i in range(1, number_of_pages)]
+    list_of_page_URLS = [main_link + str(i) for i in range(1, number_of_pages + 1)]
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
         executor.map(getLinksToGamePages, list_of_page_URLS)
