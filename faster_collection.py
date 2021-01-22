@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 # ENTER GAMERTAG CASE SENSITIVE
 # ----------------------------------------
-gamertag = "Sneaky Wizard"
+gamertag = "Clearly Im KyLe"
 
 
 def getMainLink(tag):
@@ -61,7 +61,7 @@ def gamePageDataCollection(link):
     player_id = player_id.replace('overview', 'kills')
     player_id = player_id.replace('hlGamertag', 'trPlayerRow')
 
-    players_in_game = soup.findAll('a', {'id' : re.compile('ctl00_mainContent_bnetpgd_overview')})
+    players_in_game = soup.findAll('a', {'id': re.compile('ctl00_mainContent_bnetpgd_overview')})
     players = []
     for p in players_in_game:
         players.append(p.getText())
